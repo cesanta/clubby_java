@@ -2,6 +2,7 @@
 package com.cesanta.clubby.lib;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,10 +38,37 @@ public final class Clubby {
     private int cmdId = 0;
 
     private Clubby(Builder builder) throws IOException {
-        serverAddress = builder.serverAddress;
         deviceId = builder.deviceId;
         devicePsk = builder.devicePsk;
-        backend = builder.backend;
+
+        // Init backend address
+        if (builder.backend != null) {
+            // Just set the value from builder
+            backend = builder.backend;
+        } else {
+            if (builder.serverAddress != null) {
+                // Infer backend address from the server address: remove the
+                // leading protocol part, and the trailing port. E.g.:
+                // "https://api.cesanta.com:80" -> "//api.cesanta.com"
+
+                URL url = new URL(builder.serverAddress);
+                backend = "//" + url.getHost();
+
+            } else {
+                // Set the default backend
+                backend = "//api.cesanta.com";
+            }
+        }
+
+        // Init server address
+        if (builder.serverAddress != null) {
+            // Just set the value from builder
+            serverAddress = builder.serverAddress;
+        } else {
+            // Infer server address from the backend (which is guaranteed to
+            // be set already)
+            serverAddress = "wss:" + backend + ":443";
+        }
 
         mapper = new ObjectMapper()
             .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
@@ -77,16 +105,16 @@ public final class Clubby {
         JsonFrame() {
         }
 
-        JsonFrame(Clubby clubby) {
+        JsonFrame(Clubby clubby, String dst) {
             this.src = clubby.deviceId;
-            this.dst = clubby.backend;
+            this.dst = dst;
             this.key = clubby.devicePsk;
         }
 
         static JsonFrame createFrameCmd(
-                Clubby clubby, JsonCmd jsonCmd
+                Clubby clubby, String dst, JsonCmd jsonCmd
                 ) {
-            JsonFrame frame = new JsonFrame(clubby);
+            JsonFrame frame = new JsonFrame(clubby, dst);
             frame.cmds = new ArrayList<JsonCmd>();
             frame.cmds.add(jsonCmd);
             return frame;
@@ -97,9 +125,9 @@ public final class Clubby {
          * lib will support incoming commands
          */
         static JsonFrame createFrameResp(
-                Clubby clubby, JsonResp jsonResp
+                Clubby clubby, String dst, JsonResp jsonResp
                 ) {
-            JsonFrame frame = new JsonFrame(clubby);
+            JsonFrame frame = new JsonFrame(clubby, dst);
             frame.resp = new ArrayList<JsonResp>();
             frame.resp.add(jsonResp);
             return frame;
@@ -186,21 +214,12 @@ public final class Clubby {
      *             .build();
      */
     public static class Builder {
-        private String serverAddress = "http://api.cesanta.com:80";
-        //private String serverAddress = "https://api.cesanta.com:443";
+        private String serverAddress = null;
+        private String backend = null;
         private String deviceId = "";
         private String devicePsk = "";
-        private String backend = "//api.cesanta.com";
 
         public Builder() {
-        }
-
-        /**
-         * Set server address. Default is: "http://api.cesanta.com:80"
-         */
-        public Builder serverAddress(String val) {
-            this.serverAddress = val;
-            return this;
         }
 
         /**
@@ -213,10 +232,24 @@ public final class Clubby {
         }
 
         /**
-         * Set backend value. Default is: "//api.cesanta.com"
+         * Set backend address; default is inferred from the server address,
+         * or, in case of unspecified server address, `//api.cesanta.com`.
          */
         public Builder backend(String val) {
             this.backend = val;
+            return this;
+        }
+
+        /**
+         * Set server address, default is inferred from the backend.
+         *
+         * Default example:
+         *
+         *      Backend address: "//api.cesanta.com"
+         *      Server address: "wss://api.cesanta.com:443"
+         */
+        public Builder serverAddress(String val) {
+            this.serverAddress = val;
             return this;
         }
 
@@ -339,6 +372,7 @@ public final class Clubby {
     }
 
     public void call(
+            String dst,
             String cmd,
             Object args,
             CmdListenerWrapper listenerWrapper
@@ -355,6 +389,7 @@ public final class Clubby {
         //-- prepare JSON frame
         JsonFrame jsonFrame = JsonFrame.createFrameCmd(
                 this,
+                this.backend,
                 new JsonCmd(cmd, cmdId, args)
                 );
 
@@ -369,6 +404,14 @@ public final class Clubby {
 
         //-- send it
         sendText(jsonStr);
+    }
+
+    public void callBackend(
+            String cmd,
+            Object args,
+            CmdListenerWrapper listenerWrapper
+            ) {
+        call(backend, cmd, args, listenerWrapper);
     }
 
     public ClubbyState getState() {
