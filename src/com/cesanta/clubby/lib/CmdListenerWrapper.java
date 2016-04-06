@@ -5,16 +5,27 @@ import java.io.IOException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public abstract class CmdListenerWrapper {
+public final class CmdListenerWrapper<R> {
 
-    /*
-     * NOTE: will be hidden in subclasses
-     */
-    protected CmdListener listener;
+    protected CmdListener<R> listener;
+    protected Class<R> cls;
 
     private int cmdId;
 
-    protected abstract void onResponseGeneric(ObjectMapper mapper, String respStr) throws IOException;
+    CmdListenerWrapper(CmdListener<R> listener, Class<R> cls) {
+        this.listener = listener;
+        this.cls = cls;
+    }
+
+    protected void onResponseGeneric(
+            ObjectMapper mapper, String respJsonStr
+            ) throws IOException  {
+        this.listener.onResponse(
+                mapper.readValue(
+                    respJsonStr, cls
+                    )
+                );
+    }
 
     void setCmdId(int cmdId) {
         this.cmdId = cmdId;

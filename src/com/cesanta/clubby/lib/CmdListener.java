@@ -2,12 +2,25 @@
 package com.cesanta.clubby.lib;
 
 /**
- * Generic listener for the command response. It does not actually contain
- * an `onResponse()` callback, because its signature is different for each
- * command, so, this interface is extended by each command in each service.
+ * Generic listener for the command response, parametrized with the response
+ * type.
+ *
+ * If you don't care about the response data, just use `Object`.
  */
-public interface CmdListener {
-    public void onTimeout() throws ClubbyException;
+public interface CmdListener<R> {
+
+    /**
+     * Called when a successful response (with zero status) has been received.
+     */
+    public void onResponse(R response);
+
+    /**
+     * Called when a non-successful response (with non-zero status) has been
+     * received.
+     */
     public void onError(int status, String status_msg) throws ClubbyException;
+
+    public void onTimeout() throws ClubbyException;
+
 }
 

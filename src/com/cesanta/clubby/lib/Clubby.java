@@ -287,7 +287,7 @@ public final class Clubby {
             JsonFrame jsonFrameResp = mapper.readValue(text, JsonFrame.class);
             for (JsonResp resp : jsonFrameResp.resp) {
 
-                CmdListenerWrapper listenerWrapper = cmdListenerMan.popListener(resp.id);
+                CmdListenerWrapper<?> listenerWrapper = cmdListenerMan.popListener(resp.id);
 
                 if (listenerWrapper != null) {
                     if (resp.status == 0) {
@@ -371,17 +371,41 @@ public final class Clubby {
         return ++cmdId;
     }
 
-    public void call(
+    /**
+     * Generic clubby call
+     *
+     * @param dst
+     *      Destination address. Example: `//api.cesanta.com/d/my_device`.
+     * @param cmd
+     *      Command to send. Might be any arbitrary string that the destination
+     *      device has a registered handler for.
+     * @param args
+     *      Object with command arguments; will be serialized into JSON by
+     *      means of Jackson library. Usually it does "the right thing" by
+     *      default, but in order to fine-tune the serialization process, you
+     *      can read its documentation: http://wiki.fasterxml.com/JacksonHome
+     * @param listener
+     *      Listener that will be notified once response is received, see
+     *      `CmdListener` and `CmdAdapter`.
+     * @param cls
+     *      Type of the response (should correspond to the type parameter of
+     *      listener).
+     */
+    public <R> void call(
             String dst,
             String cmd,
             Object args,
-            CmdListenerWrapper listenerWrapper
+            CmdListener<R> listener,
+            Class<R> cls
             ) {
         // get next command id
         int cmdId = getNextCmdId();
 
         // if listener is specified, take care of it
-        if (listenerWrapper != null) {
+        if (listener != null) {
+            CmdListenerWrapper<R> listenerWrapper =
+                new CmdListenerWrapper<R>(listener, cls);
+
             listenerWrapper.setCmdId(cmdId);
             cmdListenerMan.addCmdListener(listenerWrapper);
         }
@@ -389,7 +413,7 @@ public final class Clubby {
         //-- prepare JSON frame
         JsonFrame jsonFrame = JsonFrame.createFrameCmd(
                 this,
-                this.backend,
+                dst,
                 new JsonCmd(cmd, cmdId, args)
                 );
 
@@ -406,12 +430,13 @@ public final class Clubby {
         sendText(jsonStr);
     }
 
-    public void callBackend(
+    public <R> void callBackend(
             String cmd,
             Object args,
-            CmdListenerWrapper listenerWrapper
+            CmdListener<R> listener,
+            Class<R> cls
             ) {
-        call(backend, cmd, args, listenerWrapper);
+        call(backend, cmd, args, listener, cls);
     }
 
     public ClubbyState getState() {
