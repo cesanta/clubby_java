@@ -141,7 +141,7 @@ public final class Clubby {
         public String cmd = "";
         public int id = 0;
 
-        @JsonInclude(JsonInclude.Include.NON_NULL)
+        @JsonInclude(JsonInclude.Include.NON_EMPTY)
         public Object args = null;
 
         JsonCmd(String cmd, int id, Object args) {
@@ -188,17 +188,28 @@ public final class Clubby {
     }
 
     /**
-     * Connect to the server asynchronously. If the connection fails,
-     * `ListenerManager.onConnectError()` is called.
+     * Connect to the server asynchronously; when the connection is
+     * established, {@link ClubbyListener#onConnected(Clubby)
+     * ClubbyListener.onConnected()} is called. If the connection fails,
+     * {@link ClubbyListener#onConnectError(Clubby, WebSocketException)
+     * ClubbyListener.onConnectError()} is called.
      */
     public void connect() {
         ws.connectAsynchronously();
     }
 
+    /**
+     * Returns whether the underlying websocket is connected to the server.
+     */
     public boolean isConnected() {
         return ws.isOpen();
     }
 
+    /**
+     * Disconnect from the server asynchronously; when the socket is
+     * disconnected, {@link ClubbyListener#onDisconnected(Clubby)
+     * ClubbyListener.onDisconnected()} is called.
+     */
     public void disconnect() {
         ws.disconnect();
     }
@@ -386,7 +397,7 @@ public final class Clubby {
      *      can read its documentation: http://wiki.fasterxml.com/JacksonHome
      * @param listener
      *      Listener that will be notified once response is received, see
-     *      `CmdListener` and `CmdAdapter`.
+     *      {@link CmdListener CmdListener} and {@link CmdAdapter CmdAdapter}.
      * @param cls
      *      Type of the response (should correspond to the type parameter of
      *      listener).
@@ -430,6 +441,11 @@ public final class Clubby {
         sendText(jsonStr);
     }
 
+    /**
+     * The same as {@link Clubby#call(String, String, Object, CmdListener,
+     * Class) call()} with destination address set to the backend address, see
+     * {@link Clubby.Builder#backend(String) Builder.backend()}
+     */
     public <R> void callBackend(
             String cmd,
             Object args,
