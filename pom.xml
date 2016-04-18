@@ -36,7 +36,6 @@
     </repository>
   </distributionManagement>
   <build>
-    <sourceDirectory>src</sourceDirectory>
     <plugins>
       <plugin>
         <groupId>org.sonatype.plugins</groupId>
