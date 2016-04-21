@@ -9,13 +9,13 @@ final class CmdListenerManager {
     private final Map<Integer, CmdListenerWrapper<?>> listeners =
         new HashMap<Integer, CmdListenerWrapper<?>>();
 
-    public void addCmdListener(CmdListenerWrapper<?> listenerWrapper) {
+    public synchronized void addCmdListener(CmdListenerWrapper<?> listenerWrapper) {
         if (listenerWrapper != null) {
             listeners.put(listenerWrapper.getCmdId(), listenerWrapper);
         }
     }
 
-    public CmdListenerWrapper<?> popListener(int id) {
+    public synchronized CmdListenerWrapper<?> popListener(int id) {
         CmdListenerWrapper<?> ret = listeners.get(id);
         listeners.remove(id);
         return ret;

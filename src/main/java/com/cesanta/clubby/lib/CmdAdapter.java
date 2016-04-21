@@ -12,13 +12,8 @@ public class CmdAdapter<R> implements CmdListener<R> {
     public void onResponse(R response) {}
 
     @Override
-    public void onTimeout() throws ClubbyException {
-        throw new ClubbyException("timeout");
-    }
-
-    @Override
-    public void onError(int status, String status_msg) throws ClubbyException {
-        throw new ClubbyException(status_msg);
+    public void onError(int status, String statusMsg) {
+        throw new ClubbyException(statusMsg);
     }
 }
 

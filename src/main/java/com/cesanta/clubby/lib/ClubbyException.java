@@ -1,7 +1,7 @@
 
 package com.cesanta.clubby.lib;
 
-public class ClubbyException extends Exception {
+public class ClubbyException extends RuntimeException {
 
     static final long serialVersionUID = 1;
 

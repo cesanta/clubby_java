@@ -18,9 +18,7 @@ public interface CmdListener<R> {
      * Called when a non-successful response (with non-zero status) has been
      * received.
      */
-    public void onError(int status, String status_msg) throws ClubbyException;
-
-    public void onTimeout() throws ClubbyException;
+    public void onError(int status, String statusMsg);
 
 }
 

@@ -6,6 +6,10 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -27,10 +31,15 @@ public final class Clubby {
 
     private final ObjectMapper mapper;
 
+    private final ScheduledExecutorService executor
+      = Executors.newScheduledThreadPool(1);;
+
     private ClubbyState state = ClubbyState.NOT_CONNECTED;
 
     private final ListenerManager listenerMan = new ListenerManager(this);
     private final CmdListenerManager cmdListenerMan = new CmdListenerManager();
+
+    private ClubbyOptions defaultOpts = null;
 
     private WebSocket ws;
 
@@ -40,6 +49,7 @@ public final class Clubby {
     private Clubby(Builder builder) throws IOException {
         deviceId = builder.deviceId;
         devicePsk = builder.devicePsk;
+        defaultOpts = builder.opts;
 
         // Init backend address
         if (builder.backend != null) {
@@ -144,14 +154,20 @@ public final class Clubby {
         @JsonInclude(JsonInclude.Include.NON_EMPTY)
         public Object args = null;
 
-        JsonCmd(String cmd, int id, Object args) {
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public Integer timeout = null;
+
+        JsonCmd(String cmd, int id, Object args, int timeout) {
             this.cmd = cmd;
             this.id = id;
             this.args = args;
+            if (timeout != 0) {
+                this.timeout = timeout;
+            }
         }
 
-        JsonCmd(String cmd, int id) {
-            this(cmd, id, null);
+        JsonCmd(String cmd, int id, int timeout) {
+            this(cmd, id, null, timeout);
         }
     }
 
@@ -222,6 +238,7 @@ public final class Clubby {
      *     Clubby myClubby = new Clubby.Builder()
      *             .serverAddress("http://some.address.com")
      *             .device("//api.cesanta.com/d/my_device_id", "my_device_psk")
+     *             .timeout(5)
      *             .build();
      */
     public static class Builder {
@@ -229,6 +246,7 @@ public final class Clubby {
         private String backend = null;
         private String deviceId = "";
         private String devicePsk = "";
+        private ClubbyOptions opts = ClubbyOptions.createDefault();
 
         public Builder() {
         }
@@ -261,6 +279,17 @@ public final class Clubby {
          */
         public Builder serverAddress(String val) {
             this.serverAddress = val;
+            return this;
+        }
+
+        /**
+         * Set default number of seconds after when the command result is no
+         * longer relevant (and the {@link CmdListener#onError(int, String)
+         * onError()} method of the listener will be called). Set 0 for no
+         * timeout. Default: 0.
+         */
+        public Builder timeout(int timeout) {
+            opts.timeout(timeout);
             return this;
         }
 
@@ -309,7 +338,7 @@ public final class Clubby {
                                 );
                     } else {
                         /* Command has failed */
-                        listenerWrapper.listener.onError(
+                        listenerWrapper.onError(
                                 resp.status,
                                 resp.status_msg
                                 );
@@ -382,6 +411,14 @@ public final class Clubby {
         return ++cmdId;
     }
 
+    public void setDefaultOptions(ClubbyOptions opts) {
+        this.defaultOpts = ClubbyOptions.createFrom(opts);
+    }
+
+    public ClubbyOptions getOptions() {
+        return ClubbyOptions.createFrom(defaultOpts);
+    }
+
     /**
      * Generic clubby call
      *
@@ -398,26 +435,47 @@ public final class Clubby {
      * @param listener
      *      Listener that will be notified once response is received, see
      *      {@link CmdListener CmdListener} and {@link CmdAdapter CmdAdapter}.
-     * @param cls
+     * @param respClass
      *      Type of the response (should correspond to the type parameter of
      *      listener).
+     * @param opts
+     *      Options instance which will override current default options.  If
+     *      there is a need to override defaults, use {@link
+     *      Clubby#getOptions() getOptions()} to get current defaults, and then
+     *      modify received options object in some way.
      */
     public <R> void call(
             String dst,
             String cmd,
             Object args,
             CmdListener<R> listener,
-            Class<R> cls
+            Class<R> respClass,
+            ClubbyOptions opts
             ) {
         // get next command id
         int cmdId = getNextCmdId();
 
         // if listener is specified, take care of it
         if (listener != null) {
-            CmdListenerWrapper<R> listenerWrapper =
-                new CmdListenerWrapper<R>(listener, cls);
+            final CmdListenerWrapper<R> listenerWrapper =
+                new CmdListenerWrapper<R>(listener, respClass);
 
             listenerWrapper.setCmdId(cmdId);
+
+            if (opts == null) {
+                opts = defaultOpts;
+            }
+
+            if (opts.getTimeout() != 0) {
+                Future<?> timeoutFuture = executor.schedule(
+                        new TimeoutHandler(cmdId),
+                        opts.getTimeout(),
+                        TimeUnit.SECONDS
+                        );
+
+                listenerWrapper.setTimeoutFuture(timeoutFuture);
+            }
+
             cmdListenerMan.addCmdListener(listenerWrapper);
         }
 
@@ -425,7 +483,7 @@ public final class Clubby {
         JsonFrame jsonFrame = JsonFrame.createFrameCmd(
                 this,
                 dst,
-                new JsonCmd(cmd, cmdId, args)
+                new JsonCmd(cmd, cmdId, args, opts.getTimeout())
                 );
 
         //-- convert it to text
@@ -441,6 +499,16 @@ public final class Clubby {
         sendText(jsonStr);
     }
 
+    public <R> void call(
+            String dst,
+            String cmd,
+            Object args,
+            CmdListener<R> listener,
+            Class<R> respClass
+            ) {
+        call(dst, cmd, args, listener, respClass, null);
+    }
+
     /**
      * The same as {@link Clubby#call(String, String, Object, CmdListener,
      * Class) call()} with destination address set to the backend address, see
@@ -450,13 +518,42 @@ public final class Clubby {
             String cmd,
             Object args,
             CmdListener<R> listener,
-            Class<R> cls
+            Class<R> respClass,
+            ClubbyOptions opts
             ) {
-        call(backend, cmd, args, listener, cls);
+        call(backend, cmd, args, listener, respClass, opts);
+    }
+
+    public <R> void callBackend(
+            String cmd,
+            Object args,
+            CmdListener<R> listener,
+            Class<R> respClass
+            ) {
+        callBackend(cmd, args, listener, respClass, null);
     }
 
     public ClubbyState getState() {
         return state;
+    }
+
+    private class TimeoutHandler implements Runnable {
+        int cmdId;
+
+        public TimeoutHandler(int cmdId) {
+            this.cmdId = cmdId;
+        }
+
+        @Override
+        public void run() {
+            CmdListenerWrapper<?> listenerWrapper = cmdListenerMan.popListener(cmdId);
+            if (listenerWrapper != null) {
+                listenerWrapper.onError(
+                        504,
+                        "Response timeout"
+                        );
+            }
+        }
     }
 
 }
