@@ -25,8 +25,8 @@ import com.neovisionaries.ws.client.WebSocketState;
 
 public final class Clubby {
     private final String serverAddress;
-    private final String deviceId;
-    private final String devicePsk;
+    private final String id;
+    private final String psk;
     private final String backend;
 
     private final ObjectMapper mapper;
@@ -47,8 +47,8 @@ public final class Clubby {
     private int cmdId = 0;
 
     private Clubby(Builder builder) throws IOException {
-        deviceId = builder.deviceId;
-        devicePsk = builder.devicePsk;
+        id = builder.id;
+        psk = builder.psk;
         defaultOpts = builder.opts;
 
         // Init backend address
@@ -116,9 +116,9 @@ public final class Clubby {
         }
 
         JsonFrame(Clubby clubby, String dst) {
-            this.src = clubby.deviceId;
+            this.src = clubby.id;
             this.dst = dst;
-            this.key = clubby.devicePsk;
+            this.key = clubby.psk;
         }
 
         static JsonFrame createFrameCmd(
@@ -244,20 +244,27 @@ public final class Clubby {
     public static class Builder {
         private String serverAddress = null;
         private String backend = null;
-        private String deviceId = "";
-        private String devicePsk = "";
+        private String id = "";
+        private String psk = "";
         private ClubbyOptions opts = ClubbyOptions.createDefault();
 
         public Builder() {
         }
 
         /**
-         * Set device id and psk. Defaults are empty strings.
+         * Set address to use as a source in Clubby frames
          */
-        public Builder device(String id, String psk) {
-            this.deviceId = id;
-            this.devicePsk = psk;
-            return this;
+        public Builder id(String id) {
+          this.id = id;
+          return this;
+        }
+
+        /**
+         * Set pre-shared key to use
+         */
+        public Builder psk(String psk) {
+          this.psk = psk;
+          return this;
         }
 
         /**
