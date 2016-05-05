@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.cesanta</groupId>
   <artifactId>clubby</artifactId>
-  <version>0.0.2-SNAPSHOT</version>
+  <version>0.0.3-SNAPSHOT</version>
   <name>Cesanta Clubby Protocol</name>
   <description>Implementation of the Clubby protocol</description>
   <url>https://github.com/cesanta/clubby_java</url>
