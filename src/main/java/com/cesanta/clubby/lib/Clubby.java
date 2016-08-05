@@ -63,14 +63,14 @@ public final class Clubby {
             if (builder.serverAddress != null) {
                 // Infer backend address from the server address: remove the
                 // leading protocol part, and the trailing port. E.g.:
-                // "https://api.cesanta.com:80" -> "//api.cesanta.com"
+                // "https://api.mongoose-iot.com:80" -> "//api.mongoose-iot.com"
 
                 URL url = new URL(builder.serverAddress);
                 backend = "//" + url.getHost();
 
             } else {
                 // Set the default backend
-                backend = "//api.cesanta.com";
+                backend = "//api.mongoose-iot.com";
             }
         }
 
@@ -192,7 +192,6 @@ public final class Clubby {
         public Object resp = null;
     }
 
-
     /**
      * Add generic Clubby listener. Null is silently ignored.
      */
@@ -241,7 +240,7 @@ public final class Clubby {
      *
      *     Clubby myClubby = new Clubby.Builder()
      *             .serverAddress("http://some.address.com")
-     *             .device("//api.cesanta.com/d/my_device_id", "my_device_psk")
+     *             .device("//api.mongoose-iot.com/d/my_device_id", "my_device_psk")
      *             .timeout(5)
      *             .build();
      */
@@ -273,7 +272,7 @@ public final class Clubby {
 
         /**
          * Set backend address; default is inferred from the server address,
-         * or, in case of unspecified server address, `//api.cesanta.com`.
+         * or, in case of unspecified server address, `//api.mongoose-iot.com`.
          */
         public Builder backend(String val) {
             this.backend = val;
@@ -285,8 +284,8 @@ public final class Clubby {
          *
          * Default example:
          *
-         *      Backend address: "//api.cesanta.com"
-         *      Server address: "wss://api.cesanta.com:443"
+         *      Backend address: "//api.mongoose-iot.com"
+         *      Server address: "wss://api.mongoose-iot.com:443"
          */
         public Builder serverAddress(String val) {
             this.serverAddress = val;
@@ -434,7 +433,7 @@ public final class Clubby {
      * Generic clubby call
      *
      * @param dst
-     *      Destination address. Example: `//api.cesanta.com/d/my_device`.
+     *      Destination address. Example: `//api.mongoose-iot.com/d/my_device`.
      * @param cmd
      *      Command to send. Might be any arbitrary string that the destination
      *      device has a registered handler for.
@@ -568,4 +567,3 @@ public final class Clubby {
     }
 
 }
-
